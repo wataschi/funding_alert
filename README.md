@@ -3,7 +3,7 @@
 Busca los Funding Fee usando la API de coinglass
 
 **Como usar el script**
-- Crear una cuenta en coinglass [Aqui](https://www.coinglass.com/pricing/ "Aqui")
+- Crear una cuenta en coinglass [Aqui](https://www.coinglass.com/pricing/ "Aqui") y "Obtener clave de API gratuita"
 - Instale las librerias necesarias con el siguiente comando:
 ```python
 pip install -r requirements.txt
