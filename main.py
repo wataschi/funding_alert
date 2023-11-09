@@ -1,12 +1,20 @@
 import json
 import logging
 import time
+import telebot
 import requests as r
+
 
 from datetime import datetime
 from plyer import notification
 
-from common.utils import Utils
+funding = 0.2
+minutes_revision = 30
+list_exchange =['Binance']
+
+# telegram_id
+bot = telebot.TeleBot("6450084533:AAHK7z2H6TLl2vfzWo-7xXSxdG2HNuUcpIs")
+ID = 568690953
 
 logging.basicConfig(
     format='[%(asctime)s %(levelname)s] %(message)s',
@@ -14,63 +22,55 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S')
 
 
-def obtener_funding():
-    config = Utils.read_config()
-    url = config['configuracion']['coinglass_url']
-    api_key = config['configuracion']['coinglass_apikey']
+def bot_message(text) -> None:
+    bot.send_message(ID, text)
+
+
+def get_funding():
 
     url = "https://open-api.coinglass.com/public/v2/funding"
 
     headers = {
         "accept": "application/json",
-        "coinglassSecret": api_key
+        "coinglassSecret": "95f8083f7a6b4c949247e43861994b08"
     }
 
     response = r.get(url, headers=headers)
     return response
 
-def enviar_mensaje(titulo, mensaje):
-    notification.notify(title=titulo, message=mensaje, app_icon='favicon.ico', timeout=10)
+
+def send_message(title, message):
+    notification.notify(title=title, message=message, app_icon='favicon.ico', timeout=10)
 
 
-def convertir_fecha_funding(next_funding_time):
-    formato_fecha = '%Y-%m-%d %H:%M:%S'
+def convert_funding_date(next_funding_time):
+    format_date = '%H:%M:%S'
 
-    falta = ''
-    formatNextFundingTime = 'NO INFORMA'
-    if not next_funding_time is None:
+    formatNextFundingTime = 'NO INFORMATION'
+    if next_funding_time is not None:
         next_time = datetime.fromtimestamp(next_funding_time / 1000)
-        formatNextFundingTime = next_time.strftime(formato_fecha)
-        falta = cuanto_falta(next_time)
-    return formatNextFundingTime, falta
+        formatNextFundingTime = next_time.strftime(format_date)
+    return formatNextFundingTime
+
+# def time_left(funding_time):
+#     currentH, currentM, currentS = datetime.now().strftime('%H:%M:%S').split(":")
+#     nextH, nextM, nextS = funding_time.split(":")
+#
+#     defi_h = int(nextH) - int(currentH)
+#     defi_m = int(nextM) - int(currentM)
+#     defi_s = int(nextS) - int(currentS)
+#     print(f"{defi_h} : {defi_m} : {defi_s}")
 
 
-def cuanto_falta(next_time):
-    # Obtener la hora actual
-    hora_actual = datetime.now()
-
-    # Calcular la diferencia entre la hora actual y 'nextTime'
-    diferencia = next_time - hora_actual
-
-    # Extraer la diferencia en horas, minutos y segundos
-    horas = diferencia.seconds // 3600
-    minutos = (diferencia.seconds // 60) % 60
-    segundos = diferencia.seconds % 60
-
-    return f'{horas}h {minutos}m {segundos}s'
-
-
-def obtener_symbols(exchange_list, funding_fee):
-    entro = False
-    # Obtiene de la api los funding
-    response = obtener_funding()
+def get_symbols(exchange_list, funding_fee):
+    inside = False
+    response = get_funding()
     json_response = json.loads(response.text)
 
     symbol_rates = []
     for item in json_response['data']:
         symbol = item['symbol']
 
-        # Filta los exchange que usamos
         filter_rates = [margin for margin in item['uMarginList']
                         if margin['exchangeName'] in exchange_list and 'rate' in margin]
 
@@ -86,58 +86,46 @@ def obtener_symbols(exchange_list, funding_fee):
 
             symbol_rates.append(symbol_rate)
 
-    # Filtra los que el funding es mayor a la variable funding_fee
-    funding_positivos = [
+    funding_positive = [
         item for item in symbol_rates if item['rate'] >= funding_fee]
 
-    funding_negativos = [
+    funding_negative = [
         item for item in symbol_rates if item['rate'] <= (funding_fee * -1)]
 
-    # Imprime si tiene registros para short
-    if len(funding_positivos) > 0:
-        entro = True
-        logging.info(f'[PAGANDO SHORTs] ======================================================')
-        for item in sorted(funding_positivos, key=lambda x: x['rate'], reverse=True):
-            formatNextFundingTime, falta = convertir_fecha_funding(
-                item['nextFundingTime'])
-            logging.info(
-                f"EXCHANGE: {item['exchange']}, SYMBOL: {item['symbol']}, RATE: {item['rate']}, FECHA: {formatNextFundingTime}, FALTA: {falta}")
-            enviar_mensaje(f"{item['exchange']} [PAGANDO SHORTs]", f"SYMBOL: {item['symbol']}, RATE: {item['rate']}")
+    if len(funding_positive) > 0:
+        inside = True
+        logging.info(f'=========================[Оплата шортів]=============================')
+        bot_message(f"=========[Оплата шортів]========= \n=====Поточний час: {datetime.now().strftime('%H:%M:%S')}====")
+        for item in sorted(funding_positive, key=lambda x: x['rate'], reverse=True):
+            formatNextFundingTime = convert_funding_date(item['nextFundingTime'])
+            logging.info(f"Біржа: {item['exchange']}, Токен: {item['symbol']}, Ставка: {item['rate']}, Дата: {formatNextFundingTime}")
+            bot_message(f"\nЧас фандингу: {formatNextFundingTime} \nБіржа: {item['exchange']}, Токен: {item['symbol']} \nСтавка: {item['rate']},\n")
 
-    # Imprime si tiene registros para long
-    if len(funding_negativos) > 0:
-        entro = True
-        logging.info(f'[PAGANDO LONGs] ======================================================')
-        for item in sorted(funding_negativos, key=lambda x: x['rate']):
-            formatNextFundingTime, falta = convertir_fecha_funding(
-                item['nextFundingTime'])
-            logging.info(
-                f"EXCHANGE: {item['exchange']}, SYMBOL: {item['symbol']}, RATE: {item['rate']}, FECHA: {formatNextFundingTime}, FALTA: {falta}")
-            enviar_mensaje(f"{item['exchange']} [PAGANDO LONGs]", f"SYMBOL: {item['symbol']}, RATE: {item['rate']}")
-            
-    if not entro:
-        logging.info(f'No se encontraron resultados...')
+    if len(funding_negative) > 0:
+        inside = True
+        logging.info(f'=========================[Оплата лонгів]=============================')
+        bot_message(f"=========[Оплата лонгів]========= \n======[Поточний час: {datetime.now().strftime('%H:%M:%S')}]=====")
+        for item in sorted(funding_negative, key=lambda x: x['rate']):
+            formatNextFundingTime = convert_funding_date(item['nextFundingTime'])
+            logging.info(f"Біржа: {item['exchange']}, Токен: {item['symbol']}, Ставка: {item['rate']}, Дата: {formatNextFundingTime}")
+            bot_message(f"\nЧас фандингу: {formatNextFundingTime} \nБіржа: {item['exchange']}, Токен: {item['symbol']} \nСтавка: {item['rate']}\n")
+
+    if not inside:
+        logging.info(f'Нічого не знайдено...')
 
 
 if __name__ == '__main__':
-    config = Utils.read_config()
-    funding_fee = float(config['configuracion']['funding'])
-    descanso = int(config['configuracion']['minutos_revision']) * 60
+    funding_fee = float(funding)
+    time_out = int(minutes_revision) * 60
 
-    # Los exchanges que se utilizan
-    exchange_list = ['Binance', 'Bybit', 'OKX', 'Bitget']
+    exchange_list = list_exchange
 
     while True:
         try:
-            # Busca que fundings hay
-            obtener_symbols(exchange_list, funding_fee)
-
-            # Descansa cinco minutos
-            time.sleep(descanso)
+            get_symbols(exchange_list, funding_fee)
+            time.sleep(time_out)
         except KeyboardInterrupt:
             break
         except Exception as ex:
             logging.error(ex)
             pass
-
-    
