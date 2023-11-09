@@ -7,7 +7,7 @@ Search for Funding Fees using the coinglass API
 - Install the necessary libraries with the following command:
 ````python
 pip install -r requirements.txt
-```
+````
 - rename or copy the config.example.json file and change it to config.json
 - edit the config.json file
   - coinglass_apikey: enter the api here
