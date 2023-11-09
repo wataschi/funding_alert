@@ -16,4 +16,4 @@ pip install -r requirements.txt
 
 - To run it open a terminal and type the following command:
 `python main.py`
-- To edit it I recommend VSCode [Here](https://code.visualstudio.com/ "Here")
+- To edit it I recommend PyCharm
